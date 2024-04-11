@@ -53,6 +53,19 @@ public:
             return false;
     }
 
+    // Send message to server
+    void Send(const message<T>& msg)
+    {
+        if (IsConnected())
+            m_connection->Send(msg);
+    }
+
+    // Retrieve queue of messages from server
+    tsqueue<owned_message<T>>& Incoming()
+    {
+        return m_qMessagesIn;
+    }
+
 protected:
     // asio context handles the data transfer...
     asio::io_context m_context;
@@ -70,8 +83,53 @@ private:
 int main()
 {
     Client<CustomMsgTypes> c;
-    c.Connect("192.168.0.102", 52000);
+    c.Connect("ip", 52000);
     c.IsConnected();
+
+    while (c.IsConnected())
+    {
+        std::string input;
+        std::cin >> input;
+
+        message<CustomMsgTypes> msg;
+        msg << input;
+
+        c.Send(msg);
+
+        if (!c.Incoming().empty())
+        {
+            auto msg = c.Incoming().pop_front().msg;
+
+            switch (msg.header.id)
+            {
+            case CustomMsgTypes::ServerAccept:
+            {
+                // Server has responded to a ping request				
+                std::cout << "Server Accepted Connection\n";
+            }
+            break;
+
+            case CustomMsgTypes::ServerPing:
+            {
+                // Server has responded to a ping request
+                std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
+                std::chrono::system_clock::time_point timeThen;
+                msg >> timeThen;
+                std::cout << "Ping: " << std::chrono::duration<double>(timeNow - timeThen).count() << "\n";
+            }
+            break;
+
+            case CustomMsgTypes::ServerMessage:
+            {
+                // Server has responded to a ping request	
+                uint32_t clientID;
+                msg >> clientID;
+                std::cout << "Hello from [" << clientID << "]\n";
+            }
+            break;
+            }
+        }
+    }
 
     std::cout << "Hello World!\n";
 }

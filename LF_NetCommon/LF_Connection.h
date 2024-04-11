@@ -7,7 +7,7 @@
 namespace net
 {
 	template<typename T>
-	class Connection : public std::enable_shared_from_this<connection<T>>
+	class Connection : public std::enable_shared_from_this<Connection<T>>
 	{
 	public:
 		enum class Owner
@@ -68,7 +68,111 @@ namespace net
 			return m_socket.is_open();
 		}
 
+		// Prime the connection to wait for incoming messages
+		void StartListening()
+		{
+
+		}
+
+		// ASYNC - Send a message, connections are one-to-one so no need to specifiy
+			// the target, for a client, the target is the server and vice versa
+		void Send(const message<T>& msg)
+		{
+			asio::post(m_asioContext,
+				[this, msg]()
+				{
+					// If the queue has a message in it, then we must 
+					// assume that it is in the process of asynchronously being written.
+					// Either way add the message to the queue to be output. If no messages
+					// were available to be written, then start the process of writing the
+					// message at the front of the queue.
+					bool bWritingMessage = !m_qMessagesOut.empty();
+			m_qMessagesOut.push_back(msg);
+			if (!bWritingMessage)
+			{
+				WriteHeader();
+			}
+				});
+		}
+
 	private:
+		// ASYNC - Prime context to write a message header
+		void WriteHeader()
+		{
+			// If this function is called, we know the outgoing message queue must have 
+			// at least one message to send. So allocate a transmission buffer to hold
+			// the message, and issue the work - asio, send these bytes
+			asio::async_write(m_socket, asio::buffer(&m_qMessagesOut.front().header, sizeof(message_header<T>)),
+				[this](std::error_code ec, std::size_t length)
+				{
+					// asio has now sent the bytes - if there was a problem
+					// an error would be available...
+					if (!ec)
+					{
+						// ... no error, so check if the message header just sent also
+						// has a message body...
+						if (m_qMessagesOut.front().body.size() > 0)
+						{
+							// ...it does, so issue the task to write the body bytes
+							WriteBody();
+						}
+						else
+						{
+							// ...it didnt, so we are done with this message. Remove it from 
+							// the outgoing message queue
+							m_qMessagesOut.pop_front();
+
+							// If the queue is not empty, there are more messages to send, so
+							// make this happen by issuing the task to send the next header.
+							if (!m_qMessagesOut.empty())
+							{
+								WriteHeader();
+							}
+						}
+					}
+					else
+					{
+						// ...asio failed to write the message, we could analyse why but 
+						// for now simply assume the connection has died by closing the
+						// socket. When a future attempt to write to this client fails due
+						// to the closed socket, it will be tidied up.
+						std::cout << "[" << id << "] Write Header Fail.\n";
+						m_socket.close();
+					}
+				});
+		}
+
+		// ASYNC - Prime context to write a message body
+		void WriteBody()
+		{
+			// If this function is called, a header has just been sent, and that header
+			// indicated a body existed for this message. Fill a transmission buffer
+			// with the body data, and send it!
+			asio::async_write(m_socket, asio::buffer(m_qMessagesOut.front().body.data(), m_qMessagesOut.front().body.size()),
+				[this](std::error_code ec, std::size_t length)
+				{
+					if (!ec)
+					{
+						// Sending was successful, so we are done with the message
+						// and remove it from the queue
+						m_qMessagesOut.pop_front();
+
+						// If the queue still has messages in it, then issue the task to 
+						// send the next messages' header.
+						if (!m_qMessagesOut.empty())
+						{
+							WriteHeader();
+						}
+					}
+					else
+					{
+						// Sending failed, see WriteHeader() equivalent for description :P
+						std::cout << "[" << id << "] Write Body Fail.\n";
+						m_socket.close();
+					}
+				});
+		}
+
 		// ASYNC - Prime context ready to read a message header
 		void ReadHeader()
 		{
@@ -138,7 +242,10 @@ namespace net
 			// Shove it in queue, converting it to an "owned message", by initialising
 			// with the a shared pointer from this connection object
 			if (m_OwnerType == Owner::server)
+			{
+				//auto msg = { this->shared_from_this(), m_msgTemporaryIn }
 				m_qMessagesIn.push_back({ this->shared_from_this(), m_msgTemporaryIn });
+			}
 			else
 				m_qMessagesIn.push_back({ nullptr, m_msgTemporaryIn });
 
@@ -155,8 +262,9 @@ namespace net
 		// This context is shared with the whole asio instance
 		asio::io_context& m_asioContext;
 
-		// The "owner" decides how some of the connection behaves
-		Owner m_OwnerType = Owner::server;
+		// This queue holds all messages to be sent to the remote side
+		// of this connection
+		tsqueue<message<T>> m_qMessagesOut;
 
 		// This references the incoming queue of the parent object
 		tsqueue<owned_message<T>>& m_qMessagesIn;
@@ -164,6 +272,9 @@ namespace net
 		// Incoming messages are constructed asynchronously, so we will
 		// store the part assembled message here, until it is ready
 		message<T> m_msgTemporaryIn;
+
+		// The "owner" decides how some of the connection behaves
+		Owner m_OwnerType = Owner::server;
 
 		uint32_t id = 0;
 

@@ -30,7 +30,11 @@ namespace net
 		// Override for std::cout compatibility - produces friendly description of message
 		friend std::ostream& operator << (std::ostream& os, const message<T>& msg)
 		{
-			os << "ID:" << int(msg.header.id) << " Size:" << msg.header.size;
+			//os << "ID:" << int(msg.header.id) << " Size:" << msg.header.size;
+			for (size_t i = 0; i < msg.body.size(); i++)
+			{
+				os << msg.body[i];
+			}
 			return os;
 		}
 
@@ -94,12 +98,12 @@ namespace net
 
 	// Forward declare the connection
 	template <typename T>
-	class connection;
+	class Connection;
 
 	template <typename T>
 	struct owned_message
 	{
-		std::shared_ptr<connection<T>> remote = nullptr;
+		std::shared_ptr<Connection<T>> remote = nullptr;
 		message<T> msg;
 
 		// Again, a friendly string maker

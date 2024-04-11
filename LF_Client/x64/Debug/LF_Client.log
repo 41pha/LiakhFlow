@@ -3,4 +3,17 @@
   - add -D_WIN32_WINNT=0x0601 to the compiler command line; or
   - add _WIN32_WINNT=0x0601 to your project's Preprocessor Definitions.
   Assuming _WIN32_WINNT=0x0601 (i.e. Windows 7 target).
+C:\Users\Anton\source\repos\LiakhFlow\LF_NetCommon\LF_Message.h(83,1): warning C4267: =: преобразование из "size_t" в "uint32_t"; возможна потеря данных
+C:\Users\Anton\source\repos\LiakhFlow\LF_Client\LF_Client.cpp(109,32): message : выполняется компиляция ссылки на экземпляр шаблон функции "net::message<T> &net::operator >><std::chrono::system_clock::time_point>(net::message<T> &,DataType &)"
+          with
+          [
+              T=CustomMsgTypes,
+              DataType=std::chrono::system_clock::time_point
+          ]
+C:\Users\Anton\source\repos\LiakhFlow\LF_Client\LF_Client.cpp(109,21): message : выполняется компиляция ссылки на экземпляр шаблон функции "net::message<T> &net::operator >><std::chrono::system_clock::time_point>(net::message<T> &,DataType &)"
+          with
+          [
+              T=CustomMsgTypes,
+              DataType=std::chrono::system_clock::time_point
+          ]
   LF_Client.vcxproj -> C:\Users\Anton\source\repos\LiakhFlow\x64\Debug\LF_Client.exe
