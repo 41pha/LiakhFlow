@@ -1,6 +1,11 @@
 ﻿#include <iostream>
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+
 #include "LF_Connection.h"
 
+using namespace cv;
 using namespace net;
 
 enum class CustomMsgTypes : uint32_t
@@ -244,10 +249,18 @@ protected:
 
 int main()
 {
-	LF_Server<CustomMsgTypes> server(52000);
+	std::string imgPath = "C:/Users/Anton/Pictures/Camera Roll/us-east-18167cfd6-d6a4-48ef-9da1-3fa1543af4ad.png";
+
+	Mat img = imread(imgPath, IMREAD_COLOR);
+	resize(img, img, { 500, 500 }, 0, 0, cv::INTER_NEAREST);
+
+	imshow("Image", img);
+
+	waitKey(0);
+	/*LF_Server<CustomMsgTypes> server(52000);
 	server.Start();
 	while (1)
 	{
 		server.Update(-1, true);
-	}
+	}*/
 }
